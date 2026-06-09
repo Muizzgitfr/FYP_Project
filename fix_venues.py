@@ -11,6 +11,7 @@ def fix_venues():
     latest_run = ExamSchedule.objects.order_by('-id').first()
     entries = list(ScheduleEntry.objects.filter(schedule=latest_run).select_related('section', 'slot', 'venue'))
     venues = list(Venue.objects.all())
+    venues.sort(key=lambda v: v.capacity) # 40s first, 200s last
     
     # Get student counts
     section_students = defaultdict(list)
@@ -23,9 +24,15 @@ def fix_venues():
     # Calculate current usage
     for entry in entries:
         all_students = section_students[entry.section_id]
-        mid = len(all_students) // 2
-        st_ids = all_students[:mid] if entry.part == "Part 1" else all_students[mid:]
-        req_cap = len(st_ids) * 2
+        chunk_size = 20
+        try:
+            part_num = int(entry.part.split(' ')[1])
+        except (IndexError, ValueError):
+            part_num = 1
+        
+        start_idx = (part_num - 1) * chunk_size
+        st_ids = all_students[start_idx : start_idx + chunk_size]
+        req_cap = len(st_ids)
         
         slot_venue_usage[(entry.slot_id, entry.venue_id)] += req_cap
 
@@ -34,9 +41,15 @@ def fix_venues():
     
     for entry in entries:
         all_students = section_students[entry.section_id]
-        mid = len(all_students) // 2
-        st_ids = all_students[:mid] if entry.part == "Part 1" else all_students[mid:]
-        req_cap = len(st_ids) * 2
+        chunk_size = 20
+        try:
+            part_num = int(entry.part.split(' ')[1])
+        except (IndexError, ValueError):
+            part_num = 1
+        
+        start_idx = (part_num - 1) * chunk_size
+        st_ids = all_students[start_idx : start_idx + chunk_size]
+        req_cap = len(st_ids)
         
         s_id = entry.slot_id
         v_id = entry.venue_id

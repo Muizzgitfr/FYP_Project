@@ -75,10 +75,10 @@ def seed_data():
     print("🏫 Creating Venues (Main Auditorium + 11 floors)...")
     venues = []
     
-    # Explicitly add the Main Auditorium with 300 capacity (150 students with social distancing)
+    # Explicitly add the Main Auditorium with 200 capacity
     venues.append(Venue(
         name="Main Auditorium",
-        capacity=300,
+        capacity=200,
         building="Main Campus Center"
     ))
     
@@ -87,28 +87,27 @@ def seed_data():
             room_number = floor * 100 + room
             venues.append(Venue(
                 name=f"Room {room_number}",
-                capacity=50, # Strict capacity of 50 for all regular rooms
+                capacity=40, # Capped at 40 for optimal 20/20 scheduling
                 building=f"Building A - Floor {floor}"
             ))
     Venue.objects.bulk_create(venues)
 
-    print("📅 Creating Exam Slots (1 Week, 5 slots per day)...")
+    print("📅 Creating Exam Slots (8 Days, 4 slots per day)...")
     slots = []
-    # Exact times requested: 9-11, 11:30-1:30, 2-4, 4:30-6:30, 7-9
+    # 4 slots per day
     time_windows = [
         (dtime(9, 0), dtime(11, 0)),
         (dtime(11, 30), dtime(13, 30)),
         (dtime(14, 0), dtime(16, 0)),
-        (dtime(16, 30), dtime(18, 30)),
-        (dtime(19, 0), dtime(21, 0))
+        (dtime(16, 30), dtime(18, 30))
     ]
-    for day in range(7):
+    for day in range(8):
         for t_idx, (start, end) in enumerate(time_windows):
             slots.append(ExamSlot(
                 date=date(2026, 6, 1 + day),
                 start_time=start,
                 end_time=end,
-                slot_index=day * 5 + t_idx
+                slot_index=day * 4 + t_idx
             ))
     ExamSlot.objects.bulk_create(slots)
 
@@ -117,9 +116,7 @@ def seed_data():
     student_objs = []
     dept_codes = list(departments.keys())
     
-    # Create exact status distribution: 4000 Active, 1445 Graduated, 555 On Break
-    statuses = ['Active'] * 4000 + ['Graduated'] * 1445 + ['On Break'] * 555
-    random.shuffle(statuses)
+    # Create exact status distribution: 6000 Active
     
     for i, row in df_students.iterrows():
         dept_code = random.choice(dept_codes)
@@ -128,7 +125,7 @@ def seed_data():
             student_id=row['Student ID'],
             name=row['Full Name'],
             department=departments[dept_code],
-            status=statuses[i]
+            status='Active'
         ))
     Student.objects.bulk_create(student_objs)
     all_students = list(Student.objects.all())

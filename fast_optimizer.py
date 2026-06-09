@@ -25,6 +25,7 @@ def fast_optimize(schedule_id=None):
     
     venue_caps = {v.id: v.capacity for v in venues}
     slot_ids = [s.slot_index for s in slots]
+    auditorium_id = next((v.id for v in venues if v.name == "Main Auditorium"), None)
     
     # 1. Build fast lookup maps
     print("Pre-computing student matrices...")
@@ -49,14 +50,19 @@ def fast_optimize(schedule_id=None):
         chrom[entry.id] = (s_idx, v_id)
         
         all_students = section_students[entry.section_id]
-        mid = len(all_students) // 2
-        if entry.part == "Part 1":
-            st_ids = all_students[:mid]
-        else:
-            st_ids = all_students[mid:]
+        
+        # Reconstruct exactly which students are in this Part
+        chunk_size = 20
+        try:
+            part_num = int(entry.part.split(' ')[1])
+        except (IndexError, ValueError):
+            part_num = 1
+            
+        start_idx = (part_num - 1) * chunk_size
+        st_ids = all_students[start_idx : start_idx + chunk_size]
             
         t_id = entry.section.teacher_id
-        req_cap = len(st_ids) * 2 # Social distancing
+        req_cap = len(st_ids) # 100% capacity interleaving (no * 2)
         
         entry_data[entry.id] = {
             'teacher_id': t_id,
@@ -68,7 +74,7 @@ def fast_optimize(schedule_id=None):
         venue_slot_usage[(s_idx, v_id)] += req_cap
         for stid in st_ids:
             student_slot_counts[(stid, s_idx)] += 1
-            student_daily_slots[stid][s_idx // 5].append(s_idx)
+            student_daily_slots[stid][s_idx // 4].append(s_idx) # 4 slots per day
 
     def calc_student_gap_pen(stid, day):
         slots = sorted(student_daily_slots[stid][day])
@@ -120,7 +126,7 @@ def fast_optimize(schedule_id=None):
     entry_ids = list(chrom.keys())
     
     print("Starting Fast Optimization (Gaps & Clashes)...")
-    while time.time() - start_time < 300 and temp > 0.01: # 5 minutes max
+    while time.time() - start_time < 60 and temp > 0.01: # 1 minute max for SA (Total time = 5 mins)
         if best_t == 0 and best_v == 0 and best_s == 0 and best_g == 0:
             break # Perfect!
             
@@ -151,8 +157,8 @@ def fast_optimize(schedule_id=None):
         if old_v_occ > venue_caps[old_v]:
             delta_v -= min(req_cap, old_v_occ - venue_caps[old_v])
             
-        old_day = old_s // 5
-        new_day = new_s // 5
+        old_day = old_s // 4
+        new_day = new_s // 4
         
         for stid in st_ids:
             if student_slot_counts[(stid, old_s)] > 1: delta_s -= 1
@@ -181,6 +187,12 @@ def fast_optimize(schedule_id=None):
             
         # Evaluate: HUGE penalty for clashes, strong penalty for gaps
         cost_diff = (delta_t * 50000 + delta_v * 10 + delta_s * 10000 + delta_g * 1000)
+        
+        # Add penalty for Main Auditorium to deprioritize it
+        if new_v == auditorium_id:
+            cost_diff += 1 # Slight penalty
+        if old_v == auditorium_id:
+            cost_diff -= 1 # Slight reward for leaving
         
         if cost_diff < 0 or random.random() < 2.71828 ** (-cost_diff / temp):
             # Accept

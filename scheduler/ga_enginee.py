@@ -19,17 +19,24 @@ class GeneticAlgorithmScheduler:
         
         for sec in sections:
             enrolled_students = [sid for sid, sids in student_enrollments.items() if sec['id'] in sids]
-            mid = len(enrolled_students) // 2
-            p1_students = enrolled_students[:mid] # first 25
-            p2_students = enrolled_students[mid:] # second 25
             
-            #forr creating sessions
-            s1 = {'session_id': f"{sec['id']}_p1", 'section_id': sec['id'], 'teacher_id': sec['teacher_id'], 'student_count': len(p1_students), 'student_ids': p1_students, 'part': 'Part 1'}
-            s2 = {'session_id': f"{sec['id']}_p2", 'section_id': sec['id'], 'teacher_id': sec['teacher_id'], 'student_count': len(p2_students), 'student_ids': p2_students, 'part': 'Part 2'}
+            # Chunk students into groups of max 20
+            chunk_size = 20
+            chunks = [enrolled_students[i:i + chunk_size] for i in range(0, len(enrolled_students), chunk_size)]
             
-            self.sessions.extend([s1, s2])
-            for sid in p1_students: self.student_to_sessions[sid].append(s1['session_id'])
-            for sid in p2_students: self.student_to_sessions[sid].append(s2['session_id'])
+            for idx, chunk in enumerate(chunks):
+                session_id = f"{sec['id']}_p{idx+1}"
+                sess = {
+                    'session_id': session_id,
+                    'section_id': sec['id'],
+                    'teacher_id': sec['teacher_id'],
+                    'student_count': len(chunk),
+                    'student_ids': chunk,
+                    'part': f"Part {idx+1}"
+                }
+                self.sessions.append(sess)
+                for sid in chunk: 
+                    self.student_to_sessions[sid].append(session_id)
 
         self.sessions_dict = {s['session_id']: s for s in self.sessions}
         self.session_conflict_matrix = defaultdict(int)
@@ -57,7 +64,7 @@ class GeneticAlgorithmScheduler:
 
         for sid in sess_ids:
             sess = self.sessions_dict[sid]
-            req_cap = sess['student_count'] * 2
+            req_cap = sess['student_count']  # Interleaved courses, 100% physical capacity usage
             s_idx, v_id = chromosome[sid]
             
             # Conflict if: Capacity Overflow OR Teacher Busy OR Student Clash
@@ -76,7 +83,15 @@ class GeneticAlgorithmScheduler:
                     
                     if (s_i, sess['teacher_id']) not in teacher_slot_usage and \
                        not any(stid in student_slot_usage[s_i] for stid in sess['student_ids']):
-                        chromosome[sid] = (s_i, random.choice(eligible_venues)['id'])
+                        
+                        # Deprioritize Main Auditorium
+                        std_venues = [v for v in eligible_venues if v['name'] != 'Main Auditorium']
+                        if std_venues:
+                            chosen_v = random.choice(std_venues)
+                        else:
+                            chosen_v = random.choice(eligible_venues)
+                            
+                        chromosome[sid] = (s_i, chosen_v['id'])
                         s_idx, v_id = chromosome[sid]
                         found = True
                         break
@@ -105,7 +120,7 @@ class GeneticAlgorithmScheduler:
             teacher_slot_usage[(s_idx, sess['teacher_id'])] += 1
             if teacher_slot_usage[(s_idx, sess['teacher_id'])] > 1: teacher_penalty += 500000
             # Venue
-            venue_slot_occupancy[(s_idx, v_id)] += sess['student_count'] * 2
+            venue_slot_occupancy[(s_idx, v_id)] += sess['student_count']
             # Student Track
             for stid in sess['student_ids']:
                 student_schedules[stid][s_idx // 5].append(s_idx)
@@ -151,7 +166,7 @@ class GeneticAlgorithmScheduler:
                 best_overall = population[idx].copy()
                 print(f"Gen {gen}: Fitness = {best_fitness_overall:.10f}")
 
-            if (time.time() - start_time) > 600: break # 10 min limit
+            if (time.time() - start_time) > 240: break # 4 min limit for GA
 
             new_population = []
             # Elitism
@@ -190,7 +205,7 @@ def run_scheduler_django():
     from django.db.models import Count
     
     sections = list(Section.objects.annotate(student_count=Count('enrollments')).values('id', 'teacher_id', 'student_count'))
-    venues = list(Venue.objects.all().values('id', 'capacity'))
+    venues = list(Venue.objects.all().values('id', 'capacity', 'name'))
     slots_raw = list(ExamSlot.objects.all().order_by('slot_index'))
     slots = [{'slot_index': s.slot_index, 'id': s.id, 'date': s.date, 'start_time': s.start_time} for s in slots_raw]
     

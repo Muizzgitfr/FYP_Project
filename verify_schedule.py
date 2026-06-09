@@ -60,13 +60,19 @@ def verify_latest_schedule():
 
     # Check Venue Capacity
     for (v_id, s_idx), shared_entries in venue_slot_map.items():
-        # Calculate total students in this venue-slot (split logic: session has half section)
+        # Calculate total students in this venue-slot
         total_students = 0
         for e in shared_entries:
-            # We assume session size = Section size / 2
-            total_students += len(section_students[e.section_id]) // 2 + 1
+            chunk_size = 20
+            try:
+                part_num = int(e.part.split(' ')[1])
+            except (IndexError, ValueError):
+                part_num = 1
+            start_idx = (part_num - 1) * chunk_size
+            st_ids = section_students[e.section_id][start_idx : start_idx + chunk_size]
+            total_students += len(st_ids)
             
-        required_with_gaps = total_students * 2
+        required_with_gaps = total_students # 100% physical capacity, no * 2 multiplier
         capacity = shared_entries[0].venue.capacity
         if required_with_gaps > capacity:
             capacity_violations.append(f"Venue {shared_entries[0].venue.name} in Slot {s_idx}: Needs {required_with_gaps}, Has {capacity}")
@@ -84,12 +90,15 @@ def verify_latest_schedule():
     student_sessions = defaultdict(list)
     for entry in entries:
         all_students = section_students[entry.section_id]
-        mid = len(all_students) // 2
-        # Use same logic as GA for splitting
-        if entry.part == "Part 1":
-            p_students = all_students[:mid]
-        else:
-            p_students = all_students[mid:]
+        # Reconstruct chunk
+        chunk_size = 20
+        try:
+            part_num = int(entry.part.split(' ')[1])
+        except (IndexError, ValueError):
+            part_num = 1
+            
+        start_idx = (part_num - 1) * chunk_size
+        p_students = all_students[start_idx : start_idx + chunk_size]
             
         for stid in p_students:
             student_sessions[stid].append(entry)
