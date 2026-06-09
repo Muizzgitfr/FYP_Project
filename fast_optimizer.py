@@ -80,10 +80,14 @@ def fast_optimize(schedule_id=None):
         slots = sorted(student_daily_slots[stid][day])
         pen = 0
         if len(slots) > 1:
+            pen += (len(slots) - 1) * 20 # Soft base penalty for multiple exams a day
             for i in range(len(slots)-1):
                 dist = slots[i+1] - slots[i]
-                if dist > 2: # Allow dist 1 (adjacent) and dist 2 (1 slot break)
-                    pen += (dist - 2)
+                if dist == 1:
+                    pen += 100 # Huge penalty for consecutive exams
+                elif dist > 2:
+                    pen += (dist - 2) * 50 # Heavy penalty for gap > 1 slot break
+                # dist == 2 (exactly 1 slot break) adds 0 penalty!
         return pen
 
     def get_initial_penalties():

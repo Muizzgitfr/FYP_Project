@@ -129,18 +129,19 @@ class GeneticAlgorithmScheduler:
         for stid, daily in student_schedules.items():
             for day, slots in daily.items():
                 if len(slots) > 1:
+                    gap_penalty += (len(slots) - 1) * 20000 # Soft penalty for multiple exams a day
                     slots.sort()
                     # Check for clashes
                     for i in range(len(slots)-1):
                         if slots[i] == slots[i+1]:
                             conflict_penalty += 200000
                         else:
-                            # Gap penalty: If more than 1 slot apart on same day
-                            # Slot indices are 0,1,2,3,4 for each day.
-                            # dist = 1 means consecutive. dist > 1 means a gap > 30 mins.
                             dist = slots[i+1] - slots[i]
-                            if dist > 1:
-                                gap_penalty += (dist - 1) * 100000 # Huge penalty for gaps!
+                            if dist == 1:
+                                gap_penalty += 100000 # Consecutive exams are highly penalized
+                            elif dist > 2:
+                                gap_penalty += (dist - 2) * 50000 # Gap > 1 slot is penalized
+                            # If dist == 2 (exactly 1 slot break), gap_penalty += 0
 
         for (s, v), occ in venue_slot_occupancy.items():
             cap = self.venues_dict[v]['capacity']
