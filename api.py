@@ -132,9 +132,16 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
 @app.get("/api/reports/schedule-pdf")
-def get_schedule_pdf():
+def get_schedule_pdf(schedule_id: str = None):
     from scheduler.models import ExamSchedule, ScheduleEntry
-    latest_run = ExamSchedule.objects.order_by('-id').first()
+    if schedule_id and schedule_id.strip():
+        try:
+            latest_run = ExamSchedule.objects.get(id=int(schedule_id))
+        except Exception:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+    else:
+        latest_run = ExamSchedule.objects.order_by('-id').first()
+        
     if not latest_run:
         raise HTTPException(status_code=404, detail="No schedule found")
         
@@ -180,9 +187,16 @@ def get_schedule_pdf():
     return FileResponse(path, media_type="application/pdf", filename="exam_schedule.pdf")
 
 @app.get("/api/reports/students-pdf")
-def get_students_pdf():
+def get_students_pdf(schedule_id: str = None):
     from scheduler.models import ExamSchedule, ScheduleEntry, Enrollment
-    latest_run = ExamSchedule.objects.order_by('-id').first()
+    if schedule_id and schedule_id.strip():
+        try:
+            latest_run = ExamSchedule.objects.get(id=int(schedule_id))
+        except Exception:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+    else:
+        latest_run = ExamSchedule.objects.order_by('-id').first()
+        
     if not latest_run:
         raise HTTPException(status_code=404, detail="No schedule found")
         
