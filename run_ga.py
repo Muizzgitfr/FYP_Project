@@ -25,6 +25,10 @@ def main():
     print(f"\n✅ Optimization Complete in {end_time - start_time:.2f} seconds!")
     print(f"🏆 Best Fitness: {fitness:.8f}")
     
+    # Close any stale connections so Django opens a fresh socket to Supabase/Postgres
+    from django.db import connections
+    connections.close_all()
+    
     if best_schedule:
         print("\n💾 Saving Schedule to Database...")
         # Optimization: Pre-fetch slots to avoid 2800+ queries

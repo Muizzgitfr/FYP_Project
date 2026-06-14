@@ -1,0 +1,15 @@
+{
+  "academic_session": "Fall 2026",
+  "department": "Computer Science",
+  "schedule_type": "Exam Timetable",
+  "start_time": "08:30",
+  "end_time": "16:30",
+  "slot_duration": "2 Hours",
+  "break_duration": "15 Minutes",
+  "constraints": {
+    "no_double_booking": true,
+    "prevent_faculty_clash": true,
+    "room_capacity_check": true,
+    "avoid_consecutive_classes": false
+  }
+}

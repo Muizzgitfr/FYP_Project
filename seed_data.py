@@ -148,14 +148,25 @@ def seed_data():
     active_students = [s for s in all_students if s.status == 'Active']
     enrollments = []
     count = 0
+    course_enrollment_counts = defaultdict(int)
+    
     for student in active_students:
         own_dept_courses = [c for c in all_courses if c.department_id == student.department_id]
         num_courses = random.randint(5, 7)
-        selected_courses = random.sample(own_dept_courses, min(num_courses, len(own_dept_courses)))
+        
+        # Filter own_dept_courses to only those that have less than 55 enrollments
+        available_courses = [c for c in own_dept_courses if course_enrollment_counts[c.id] < 55]
+        if not available_courses:
+            continue
+            
+        selected_courses = random.sample(available_courses, min(num_courses, len(available_courses)))
         
         for course in selected_courses:
+            if course_enrollment_counts[course.id] >= 55:
+                continue
             sec = random.choice(course_to_sections[course.id])
             enrollments.append(Enrollment(student=student, section=sec))
+            course_enrollment_counts[course.id] += 1
             count += 1
             
         if len(enrollments) >= 2000:
@@ -164,7 +175,7 @@ def seed_data():
 
     if enrollments: Enrollment.objects.bulk_create(enrollments, ignore_conflicts=True)
 
-    print(f"✨ Seeding Complete! Total Active Students Enrolled: {len(active_students)}")
+    print(f"✨ Seeding Complete! Total Active Enrollments Created: {count}")
 
 if __name__ == "__main__":
     seed_data()
